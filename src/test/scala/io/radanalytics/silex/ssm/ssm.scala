@@ -23,54 +23,52 @@ import breeze.linalg.{DenseMatrix, DenseVector}
 import org.scalatest._
 
 class SsmStructureSpec extends FlatSpec with Matchers {
+
+  def dimensions(structure: Structure, n: Int): Unit = {
+    assert(structure.F.cols.equals(1))
+    assert(structure.F.rows.equals(n))
+    assert(structure.G.cols.equals(n))
+    assert(structure.G.rows.equals(n))
+    assert(structure.W.cols.equals(n))
+    assert(structure.W.rows.equals(n))
+  }
+
   it should "create a locally constant structure with the correct dimensions" in {
     val structure = Structure.locallyConstant(1.0)
-    assert(structure.F.cols.equals(1))
-    assert(structure.F.rows.equals(1))
-    assert(structure.G.cols.equals(1))
-    assert(structure.G.rows.equals(1))
-    assert(structure.W.cols.equals(1))
-    assert(structure.W.rows.equals(1))
+    dimensions(structure, 1)
   }
   it should "create a locally linear structure with the correct dimensions" in {
     val structure = Structure.locallyLinear(DenseMatrix.eye[Double](2))
-    assert(structure.F.cols.equals(1))
-    assert(structure.F.rows.equals(2))
-    assert(structure.G.cols.equals(2))
-    assert(structure.G.rows.equals(2))
-    assert(structure.W.cols.equals(2))
-    assert(structure.W.rows.equals(2))
+    dimensions(structure, 2)
   }
   it should "create a fourier structure (1 harmonic) with the correct dimensions" in {
     val structure = Structure.cyclicFourier(period = 100,
       harmonics = 1, W = DenseMatrix.eye[Double](2))
-    assert(structure.F.cols.equals(1))
-    assert(structure.F.rows.equals(2))
-    assert(structure.G.cols.equals(2))
-    assert(structure.G.rows.equals(2))
-    assert(structure.W.cols.equals(2))
-    assert(structure.W.rows.equals(2))
+    dimensions(structure, 2)
   }
   it should "create a fourier structure (2 harmonics) with the correct dimensions" in {
     val structure = Structure.cyclicFourier(period = 100,
       harmonics = 2, W = DenseMatrix.eye[Double](4))
-    assert(structure.F.cols.equals(1))
-    assert(structure.F.rows.equals(4))
-    assert(structure.G.cols.equals(4))
-    assert(structure.G.rows.equals(4))
-    assert(structure.W.cols.equals(4))
-    assert(structure.W.rows.equals(4))
+    dimensions(structure, 4)
   }
   it should "create a fourier structure (3 harmonics) with the correct dimensions" in {
     val structure = Structure.cyclicFourier(period = 100,
       harmonics = 3, W = DenseMatrix.eye[Double](6))
-    assert(structure.F.cols.equals(1))
-    assert(structure.F.rows.equals(6))
-    assert(structure.G.cols.equals(6))
-    assert(structure.G.rows.equals(6))
-    assert(structure.W.cols.equals(6))
-    assert(structure.W.rows.equals(6))
+    dimensions(structure, 6)
   }
+  it should "compose a locally constant and fourier (1 harmonic) with the correct dimensions" in {
+    val lc = Structure.locallyConstant(1.0)
+    val fourier = Structure.cyclicFourier(period = 100,
+      harmonics = 1, W = DenseMatrix.eye[Double](2))
+    val structure = lc + fourier
+    dimensions(structure, 3)
+  }
+  it should "compose two locally constant with the correct dimensions" in {
+    val lc = Structure.locallyConstant(1.0)
+    val structure = lc + lc
+    dimensions(structure, 2)
+  }
+
 
 }
 
@@ -81,6 +79,39 @@ class GaussianDlmSpec extends FlatSpec with Matchers {
     val prior = DenseVector.zeros[Double](1)
     val nextState = gaussianDLM.nextState(prior)
 
-    assert(nextState.length.equals(1))
+    assert(nextState.length.equals(prior.length))
   }
+  it should "keep state dimensions on propagation with locally linear structure" in {
+    val structure = Structure.locallyLinear(DenseMatrix.eye[Double](2))
+    val gaussianDLM = new GaussianDLM(structure = structure, V = 1.0)
+    val prior = DenseVector.zeros[Double](2)
+    val nextState = gaussianDLM.nextState(prior)
+
+    assert(nextState.length.equals(prior.length))
+  }
+  it should "keep state dimensions on propagation with fourier (1 harmonic) structure" in {
+    val structure = Structure.cyclicFourier(period = 100, harmonics = 1, W = DenseMatrix.eye[Double](2))
+    val gaussianDLM = new GaussianDLM(structure = structure, V = 1.0)
+    val prior = DenseVector.zeros[Double](2)
+    val nextState = gaussianDLM.nextState(prior)
+
+    assert(nextState.length.equals(prior.length))
+  }
+  it should "keep state dimensions on propagation with fourier (2 harmonic) structure" in {
+    val structure = Structure.cyclicFourier(period = 100, harmonics = 2, W = DenseMatrix.eye[Double](4))
+    val gaussianDLM = new GaussianDLM(structure = structure, V = 1.0)
+    val prior = DenseVector.zeros[Double](4)
+    val nextState = gaussianDLM.nextState(prior)
+
+    assert(nextState.length.equals(prior.length))
+  }
+  it should "keep state dimensions on propagation with fourier (3 harmonic) structure" in {
+    val structure = Structure.cyclicFourier(period = 100, harmonics = 3, W = DenseMatrix.eye[Double](6))
+    val gaussianDLM = new GaussianDLM(structure = structure, V = 1.0)
+    val prior = DenseVector.zeros[Double](6)
+    val nextState = gaussianDLM.nextState(prior)
+
+    assert(nextState.length.equals(prior.length))
+  }
+
 }
