@@ -20,16 +20,15 @@
 package io.radanalytics.silex.ssm
 
 import breeze.linalg.{DenseMatrix, DenseVector}
-import breeze.stats.distributions.{Gaussian, MultivariateGaussian}
+import breeze.stats.distributions.{Binomial, Gaussian, MultivariateGaussian, Poisson}
 
 case class Structure(F: DenseMatrix[Double],
                      G: DenseMatrix[Double],
                      W: DenseMatrix[Double]) {
   def +(that: Structure): Structure = {
-    val _F = DenseMatrix.vertcat[Double](F, that.F)
-    val _G = Utils.bdiag(Seq(G, that.G))
-    val _W = Utils.bdiag(Seq(W, that.W))
-    Structure(F = _F, G = _G, W = _W)
+    Structure(F = DenseMatrix.vertcat[Double](F, that.F),
+      G = Utils.bdiag(Seq(G, that.G)),
+      W = Utils.bdiag(Seq(W, that.W)))
   }
 }
 
@@ -46,6 +45,8 @@ object Utils {
     }: _*)
 
   }
+
+  def ilogit(x: Double): Double = Math.exp(x) / (1.0 + Math.exp(x))
 }
 
 object Structure {
@@ -103,12 +104,33 @@ abstract class DGLM[U](structure: Structure) {
 
 }
 
-class GaussianDLM(structure: Structure, V: Double)
+class GaussianDLM(structure: Structure, val V: Double)
   extends DGLM[Double](structure = structure) {
 
   override def observation(state: DenseVector[Double]): Double = {
 
     new Gaussian((structure.F.t * state).apply(0), V).sample()
+
+  }
+}
+
+class PoissonDLM(structure: Structure) extends DGLM[Int](structure = structure) {
+
+  override def observation(state: DenseVector[Double]): Int = {
+
+    val mean = (structure.F.t * state).apply(0)
+    new Poisson(Math.exp(mean)).sample()
+
+  }
+
+}
+
+class BinomialDLM(structure: Structure, val categories: Int) extends DGLM[Int](structure = structure) {
+
+  override def observation(state: DenseVector[Double]): Int = {
+
+    val mean = (structure.F.t * state).apply(0)
+    Binomial(categories, Utils.ilogit(mean)).sample()
 
   }
 }
